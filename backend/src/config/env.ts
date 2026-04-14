@@ -14,4 +14,9 @@ export const ENV = {
   JWT_REFRESH_SECRET: requireEnv('JWT_REFRESH_SECRET'),
   JWT_ACCESS_TOKEN_EXPIRY: requireEnv('JWT_ACCESS_TOKEN_EXPIRY'),
   JWT_REFRESH_TOKEN_EXPIRY: requireEnv('JWT_REFRESH_TOKEN_EXPIRY'),
+  SMTP_HOST: requireEnv('SMTP_HOST'),
+  SMTP_PORT: requireEnv('SMTP_PORT'),
+  SMTP_USER: requireEnv('SMTP_USER'),
+  SMTP_PASS: requireEnv('SMTP_PASS'),
+  FROM_EMAIL: requireEnv('FROM_EMAIL'),
 };

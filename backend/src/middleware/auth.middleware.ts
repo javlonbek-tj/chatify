@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { eq } from 'drizzle-orm';
 import { verifyAccessToken, JwtPayload } from '../modules/auth/auth.service';
-import { db } from '../db/db';
-import { users } from '../db/schema';
+import User from '../modules/user/user.model';
 
 declare global {
   namespace Express {
@@ -17,73 +15,38 @@ export async function authenticate(
   res: Response,
   next: NextFunction,
 ) {
-  // 1) Token mavjudligini tekshirish
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
-    res
-      .status(401)
-      .json({ status: 'fail', message: 'Autentifikatsiya talab qilinadi' });
+    res.status(401).json({ status: 'fail', message: 'Authentication required' });
     return;
   }
 
   const token = authHeader.slice(7);
 
   try {
-    // 2) Tokenni tekshirish
     const decoded = verifyAccessToken(token);
 
-    // 3) DB dan foydalanuvchini yuklash (fresh ma'lumot)
-    const [currentUser] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, decoded.userId));
-
-    if (!currentUser) {
-      res
-        .status(401)
-        .json({ status: 'fail', message: 'Foydalanuvchi topilmadi' });
+    const user = await User.findById(decoded.userId).select('-password');
+    if (!user) {
+      res.status(401).json({ status: 'fail', message: 'User not found' });
       return;
     }
 
-    // 4) Hisob bloklangan yoki o'chirilganmi
-    if (!currentUser.isActive) {
-      res.status(401).json({ status: 'fail', message: "Hisob o'chirilgan" });
-      return;
-    }
-
-    if (currentUser.isBlocked) {
-      res.status(403).json({
-        status: 'fail',
-        message: "Hisobingiz bloklangan. Administrator bilan bog'laning",
-      });
-      return;
-    }
-
-    // 5) Token berilgandan keyin parol o'zgartirilganmi
+    // Reject token if password was changed after it was issued
     if (
-      currentUser.passwordChangedAt &&
+      user.passwordChangedAt &&
       decoded.iat != null &&
-      decoded.iat < currentUser.passwordChangedAt.getTime() / 1000
+      decoded.iat < user.passwordChangedAt.getTime() / 1000
     ) {
-      res
-        .status(401)
-        .json({ status: 'fail', message: 'Token eskirgan. Qayta kiring' });
+      res.status(401).json({ status: 'fail', message: 'Password recently changed. Please log in again.' });
       return;
     }
 
-    req.user = {
-      userId: currentUser.id,
-      username: currentUser.username,
-      role: currentUser.role,
-      regionId: currentUser.regionId,
-      districtId: currentUser.districtId,
-    };
+    req.user = { userId: user._id.toString(), email: user.email };
 
     next();
   } catch {
-    res
-      .status(401)
-      .json({ status: 'fail', message: 'Token yaroqsiz yoki muddati tugagan' });
+    res.status(401).json({ status: 'fail', message: 'Invalid or expired token' });
   }
 }
