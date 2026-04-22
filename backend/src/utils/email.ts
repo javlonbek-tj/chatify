@@ -6,7 +6,7 @@ const transporter = nodemailer.createTransport({
   port: Number(ENV.SMTP_PORT),
   auth: {
     user: ENV.SMTP_USER,
-    pass: ENV.SMTP_PASS,
+    pass: ENV.SMTP_PASSWORD,
   },
 });
 
@@ -14,7 +14,7 @@ export async function sendPasswordResetEmail(to: string, resetToken: string) {
   const resetUrl = `${ENV.FRONTEND_URL}/reset-password/${resetToken}`;
 
   await transporter.sendMail({
-    from: ENV.FROM_EMAIL,
+    from: ENV.SMTP_FROM_EMAIL,
     to,
     subject: 'Password Reset Request (valid for 10 minutes)',
     html: `

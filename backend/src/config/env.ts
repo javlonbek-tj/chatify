@@ -8,6 +8,7 @@ function requireEnv(key: string): string {
 
 export const ENV = {
   PORT: requireEnv('PORT'),
+  NODE_ENV: requireEnv('NODE_ENV'),
   FRONTEND_URL: requireEnv('FRONTEND_URL'),
   MONGODB_URI: requireEnv('MONGODB_URI'),
   JWT_SECRET: requireEnv('JWT_SECRET'),
@@ -17,6 +18,6 @@ export const ENV = {
   SMTP_HOST: requireEnv('SMTP_HOST'),
   SMTP_PORT: requireEnv('SMTP_PORT'),
   SMTP_USER: requireEnv('SMTP_USER'),
-  SMTP_PASS: requireEnv('SMTP_PASS'),
-  FROM_EMAIL: requireEnv('FROM_EMAIL'),
+  SMTP_PASSWORD: requireEnv('SMTP_PASSWORD'),
+  SMTP_FROM_EMAIL: requireEnv('SMTP_FROM_EMAIL'),
 };
