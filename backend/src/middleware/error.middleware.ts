@@ -4,7 +4,9 @@ import { ENV } from '../config/env';
 import logger from '../utils/logger';
 
 const sendErrorDev = (err: AppError, res: Response) => {
-  logger.error(err.message, { stack: err.stack, statusCode: err.statusCode });
+  if (err.statusCode >= 500) {
+    logger.error(err.message, { stack: err.stack, statusCode: err.statusCode });
+  }
   res.status(err.statusCode).json({
     status: err.status,
     message: err.message,

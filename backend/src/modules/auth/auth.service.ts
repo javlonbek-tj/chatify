@@ -1,10 +1,13 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { ENV } from '../../config/env';
 import { AppError } from '../../utils/appError';
+import { sendOtpEmail } from '../../utils/email';
 import User from '../user/user.model';
 import Token from './token.model';
-import type { RegisterInput, LoginInput } from './auth.schema';
+import Otp from './otp.model';
+import type { RegisterInput, LoginInput, VerifyOtpInput, ResendOtpInput } from './auth.schema';
 
 export interface JwtPayload {
   userId: string;
@@ -13,6 +16,7 @@ export interface JwtPayload {
 }
 
 const REFRESH_TOKEN_EXPIRES_MS = 7 * 24 * 60 * 60 * 1000;
+const OTP_EXPIRES_MS = 10 * 60 * 1000;
 
 export function signAccessToken(payload: Omit<JwtPayload, 'iat'>): string {
   return jwt.sign(payload, ENV.JWT_SECRET, {
@@ -34,6 +38,19 @@ export function verifyRefreshToken(token: string): JwtPayload {
   return jwt.verify(token, ENV.JWT_REFRESH_SECRET) as JwtPayload;
 }
 
+async function generateAndSendOtp(userId: string, email: string) {
+  const otp = crypto.randomInt(100000, 999999).toString();
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+
+  await Otp.findOneAndUpdate(
+    { userId },
+    { otpHash, expiresAt: new Date(Date.now() + OTP_EXPIRES_MS) },
+    { upsert: true },
+  );
+
+  await sendOtpEmail(email, otp);
+}
+
 export async function register(input: RegisterInput) {
   const existing = await User.findOne({ email: input.email });
   if (existing) {
@@ -47,6 +64,35 @@ export async function register(input: RegisterInput) {
     fullName: input.fullName,
     password: passwordHash,
   });
+
+  await generateAndSendOtp(user._id.toString(), user.email);
+}
+
+export async function verifyOtp(input: VerifyOtpInput) {
+  const user = await User.findOne({ email: input.email });
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (user.isVerified) {
+    throw new AppError('Email is already verified', 400);
+  }
+
+  const otpHash = crypto.createHash('sha256').update(input.otp).digest('hex');
+  const stored = await Otp.findOne({ userId: user._id });
+
+  if (!stored || stored.otpHash !== otpHash) {
+    throw new AppError('Invalid OTP', 400);
+  }
+
+  if (stored.expiresAt < new Date()) {
+    await Otp.deleteOne({ userId: user._id });
+    throw new AppError('OTP has expired', 400);
+  }
+
+  user.isVerified = true;
+  await user.save();
+  await Otp.deleteOne({ userId: user._id });
 
   const payload = { userId: user._id.toString(), email: user.email };
   const accessToken = signAccessToken(payload);
@@ -70,6 +116,19 @@ export async function register(input: RegisterInput) {
   };
 }
 
+export async function resendOtp(input: ResendOtpInput) {
+  const user = await User.findOne({ email: input.email });
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (user.isVerified) {
+    throw new AppError('Email is already verified', 400);
+  }
+
+  await generateAndSendOtp(user._id.toString(), user.email);
+}
+
 export async function login(input: LoginInput) {
   const user = await User.findOne({ email: input.email });
   if (!user) {
@@ -79,6 +138,10 @@ export async function login(input: LoginInput) {
   const passwordMatch = await bcrypt.compare(input.password, user.password);
   if (!passwordMatch) {
     throw new AppError('Invalid email or password', 401);
+  }
+
+  if (!user.isVerified) {
+    throw new AppError('Please verify your email before logging in', 403);
   }
 
   const payload = { userId: user._id.toString(), email: user.email };
@@ -131,4 +194,8 @@ export async function refresh(token: string) {
 
 export async function logout(token: string) {
   await Token.deleteOne({ token });
+}
+
+export async function logoutAll(userId: string) {
+  await Token.deleteMany({ userId });
 }

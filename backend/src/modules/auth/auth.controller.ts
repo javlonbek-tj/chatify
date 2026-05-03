@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { registerSchema, loginSchema } from './auth.schema';
+import { registerSchema, loginSchema, verifyOtpSchema, resendOtpSchema } from './auth.schema';
 import * as authService from './auth.service';
 import { AppError } from '../../utils/appError';
 
@@ -17,16 +17,44 @@ export async function register(req: Request, res: Response) {
     throw new AppError(parsed.error.issues[0].message, 400);
   }
 
-  const result = await authService.register(parsed.data);
+  await authService.register(parsed.data);
+
+  res.status(201).json({
+    status: 'success',
+    message: 'Verification code sent to your email',
+  });
+}
+
+export async function verifyEmail(req: Request, res: Response) {
+  const parsed = verifyOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0].message, 400);
+  }
+
+  const result = await authService.verifyOtp(parsed.data);
 
   res.cookie(COOKIE_NAME, result.refreshToken, COOKIE_OPTIONS);
 
-  res.status(201).json({
+  res.status(200).json({
     status: 'success',
     data: {
       accessToken: result.accessToken,
       user: result.user,
     },
+  });
+}
+
+export async function resendOtp(req: Request, res: Response) {
+  const parsed = resendOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0].message, 400);
+  }
+
+  await authService.resendOtp(parsed.data);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Verification code resent to your email',
   });
 }
 
@@ -73,4 +101,14 @@ export async function logout(req: Request, res: Response) {
   res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
 
   res.status(200).json({ status: 'success', message: 'Logged out' });
+}
+
+export async function logoutAll(req: Request, res: Response) {
+  const userId = req.user!.userId;
+
+  await authService.logoutAll(userId);
+
+  res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
+
+  res.status(200).json({ status: 'success', message: 'Logged out from all devices' });
 }

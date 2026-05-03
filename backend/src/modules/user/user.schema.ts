@@ -19,6 +19,14 @@ export const updatePasswordSchema = z.object({
     .max(128, 'Password is too long'),
 });
 
+export const updateUserSchema = z.object({
+  fullName: z.string().min(1, 'Full name is required').max(100, 'Full name is too long').optional(),
+  profilePic: z.url('Invalid profile picture URL').optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: 'At least one field must be provided',
+});
+
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;

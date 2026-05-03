@@ -1,6 +1,6 @@
 import http from 'http';
 import { ENV } from './config/env';
-import mongoose from 'mongoose';
+import { connectDb } from './config/db';
 import logger from './utils/logger';
 
 process.on('uncaughtException', (err: Error) => {
@@ -14,12 +14,7 @@ let server: http.Server;
 
 async function start(): Promise<void> {
   try {
-    await mongoose.connect(ENV.MONGODB_URI);
-    logger.info('DB connection successful!');
-
-    mongoose.connection.on('error', (err) => {
-      logger.error('MongoDB connection error', { error: err.message });
-    });
+    await connectDb();
 
     server = app.listen(ENV.PORT, () => {
       logger.info(`Server is running on port ${ENV.PORT} in ${ENV.NODE_ENV} mode`);

@@ -11,30 +11,24 @@ const devFormat = combine(
   printf(({ level, message, timestamp, stack, ...meta }) => {
     const extra = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
     return `${timestamp} [${level}]: ${stack ?? message}${extra}`;
-  }),
+  })
 );
 
-const prodFormat = combine(
-  timestamp(),
-  errors({ stack: true }),
-  json(),
-);
+const prodFormat = combine(timestamp(), errors({ stack: true }), json());
 
 const transports: winston.transport[] = [new winston.transports.Console()];
 
 if (ENV.NODE_ENV === 'production') {
-  // Combined logs: all levels (warn and above)
   transports.push(
     new DailyRotateFile({
       filename: 'logs/combined-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
-      zippedArchive: true, // compress rotated files to .gz
-      maxSize: '20m',      // max 20MB per file
-      maxFiles: '30d',     // delete files older than 30 days
-    }),
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '30d',
+    })
   );
 
-  // Error logs: error level only
   transports.push(
     new DailyRotateFile({
       filename: 'logs/error-%DATE%.log',
@@ -42,8 +36,8 @@ if (ENV.NODE_ENV === 'production') {
       level: 'error',
       zippedArchive: true,
       maxSize: '20m',
-      maxFiles: '90d', // retain errors longer for post-mortem analysis
-    }),
+      maxFiles: '90d',
+    })
   );
 }
 
